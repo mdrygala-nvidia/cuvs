@@ -502,6 +502,17 @@ ConfigureTest(
   PERCENT 100
 )
 
+# EXPERIMENT (temporary, remove before merging): PQ codebook batching harness
+ConfigureTest(
+  NAME PQ_EXPERIMENT
+  PATH ../src/neighbors/ivf_pq/pq_exp_main.cu
+  # libcuvs.so hides internal symbols (CXX_VISIBILITY_PRESET hidden); the static library is built
+  # from the same object files and exposes them to the linker.
+  ADDITIONAL_DEP cuvs::cuvs_static
+  GPUS 1
+  PERCENT 100
+)
+
 # ##################################################################################################
 # Install tests ####################################################################################
 # ##################################################################################################
