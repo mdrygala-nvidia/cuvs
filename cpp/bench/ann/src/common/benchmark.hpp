@@ -352,7 +352,10 @@ void bench_search(::benchmark::State& state,
         dynamic_cast<algo<T>*>(current_algo.get())->estimate_work(n_queries, k)) {
     const auto n_batches = queries_processed / n_queries;
     state.SetBytesProcessed(work->bytes * n_batches);
-    state.counters.insert({"flops_per_second", {work->flops * n_batches, benchmark::Counter::kIsRate}});
+    if (work->flops) {
+      state.counters.insert(
+        {"flops_per_second", {*work->flops * n_batches, benchmark::Counter::kIsRate}});
+    }
   }
 
   if (state.skipped()) { return; }

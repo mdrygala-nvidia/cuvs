@@ -21,6 +21,8 @@
 #include <raft/linalg/unary_op.cuh>
 #include <raft/util/cudart_utils.hpp>
 
+#include <cmath>
+#include <optional>
 #include <type_traits>
 
 namespace cuvs::bench {
@@ -84,6 +86,8 @@ class cuvs_ivf_pq : public algo<T>, public algo_gpu {
   void save(const std::string& file) const override;
   void load(const std::string&) override;
   std::unique_ptr<algo<T>> copy() override;
+  [[nodiscard]] auto estimate_work(int n_queries, int k) const
+    -> std::optional<work_estimate> override;
 
  private:
   // handle_ must go first to make sure it dies last and all memory allocated in pool
@@ -127,6 +131,38 @@ template <typename T, typename IdxT>
 std::unique_ptr<algo<T>> cuvs_ivf_pq<T, IdxT>::copy()
 {
   return std::make_unique<cuvs_ivf_pq<T, IdxT>>(*this);  // use copy constructor
+}
+
+template <typename T, typename IdxT>
+auto cuvs_ivf_pq<T, IdxT>::estimate_work(int n_queries, int k) const
+  -> std::optional<work_estimate>
+{
+  const double nlist  = index_->n_lists();
+  const double nprobe = search_params_.n_probes;
+  const double n_rows = index_->size();
+  const double dim    = dimension_;
+
+  // Bytes of one compressed vector: pq_dim codes of pq_bits bits each.
+  const double compressed_vector_bytes =
+    static_cast<double>(index_->pq_dim()) * index_->pq_bits() / 8.0;
+
+  // Average number of vectors in one cluster (the clusters are assumed to be equal-sized).
+  const double average_cluster_size = n_rows / nlist;
+
+  // Expected number of distinct clusters probed in the batch if each query picks nprobe clusters
+  // uniformly at random. Each of them is read once per batch; the centroids are read once per batch.
+  const double distinct_clusters_probed =
+    nlist * (1.0 - std::pow(1.0 - nprobe / nlist, n_queries));
+
+  // Only the coarse search and the scan of the compressed vectors are counted. The query rotation,
+  // the lookup tables and the refinement step are not.
+  const size_t bytes = sizeof(float) * nlist * dim +
+                       distinct_clusters_probed * average_cluster_size * compressed_vector_bytes +
+                       sizeof(T) * n_queries * dim +
+                       n_queries * k * (sizeof(float) + sizeof(algo_base::index_type));
+
+  // Flops are not estimated for IVF-PQ yet.
+  return work_estimate{std::nullopt, bytes};
 }
 
 template <typename T, typename IdxT>

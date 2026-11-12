@@ -81,9 +81,12 @@ struct algo_property {
   MemoryType query_memory_type;
 };
 
-/** Estimated work done by one search() call, used for throughput counters. */
+/**
+ * Estimated work done by one search() call, used for throughput counters.
+ * `flops` is empty if the algorithm cannot estimate it.
+ */
 struct work_estimate {
-  double flops;
+  std::optional<double> flops;
   size_t bytes;
 };
 
